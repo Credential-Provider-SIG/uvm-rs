@@ -1,14 +1,14 @@
 use data_encoding::{Specification, BASE64, BASE64URL, BASE64_NOPAD};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenBox {
     #[serde(with = "base64")]
     pub public_key: Vec<u8>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SealedBox {
     #[serde(with = "base64")]
@@ -21,13 +21,13 @@ pub struct SealedBox {
     pub key_derivation_salt: Vec<u8>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Vault {
     pub passkeys: Vec<Passkey>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Passkey {
     pub credential_id: String,
