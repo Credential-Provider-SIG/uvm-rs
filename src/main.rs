@@ -2,6 +2,7 @@ use clap::Parser;
 
 mod cli;
 mod crypto;
+mod model;
 mod schema;
 
 fn main() {

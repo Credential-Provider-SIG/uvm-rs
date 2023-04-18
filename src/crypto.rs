@@ -130,17 +130,10 @@ fn hkdf<'n>(shared_secret: &[u8], salt: Salt) -> Result<LessSafeKey, Error> {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::schema::Passkey;
-
-    use super::*;
-    #[test]
-    fn round_trip_sanity_check() {
-        let rng = ring::rand::SystemRandom::new();
-        let importing = LocalKeyPair::new(&rng).unwrap();
-        let open_box = importing.to_open_box().unwrap();
-        let vault = Vault {
-            passkeys: vec![Passkey {
+pub fn mock_vault() -> Vault {
+    Vault {
+        passkeys: vec![
+            crate::schema::Passkey {
                 credential_id: "AFTS_7DYRxzc0MnH6novvg".into(),
                 relying_party_id: "future.1password.com".into(),
                 relying_party_name: "1Password's future".into(),
@@ -151,8 +144,33 @@ mod tests {
                     218, 32, 172, 102, 165, 240, 198, 99, 5, 244, 84, 124, 112, 8, 78, 139, 17,
                     171, 147, 13, 27, 190, 226, 169, 8, 68, 234, 22, 250, 62, 22, 67,
                 ],
-            }],
-        };
+            },
+            crate::schema::Passkey {
+                credential_id: "Y4MwpGtlC5WtHHf2bGZ5JhWvKq8nyJd8C2hUyANZfCo".into(),
+                relying_party_id: "ebay.com".into(),
+                relying_party_name: "Ebay".into(),
+                user_handle: "AyTX4-DemFSn19IWC9EDd_AvDFsUUi4vSd6EhiwoaFg".into(),
+                user_display_name: "wendy.appleseed@gmail.com".into(),
+                counter: "42".into(),
+                private_key: vec![
+                    202, 71, 46, 146, 44, 45, 13, 148, 133, 153, 77, 20, 30, 227, 113, 91, 58, 245,
+                    139, 188, 126, 95, 171, 140, 5, 119, 13, 69, 229, 100, 84, 142,
+                ],
+            },
+        ],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    #[test]
+    fn round_trip_sanity_check() {
+        let rng = ring::rand::SystemRandom::new();
+        let importing = LocalKeyPair::new(&rng).unwrap();
+        let open_box = importing.to_open_box().unwrap();
+        let vault = mock_vault();
         let encoded_vault = serde_json::to_vec(&vault).unwrap();
 
         let exporting = LocalKeyPair::new(&rng).unwrap();
