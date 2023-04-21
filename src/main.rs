@@ -4,20 +4,24 @@ use std::{
 };
 
 use clap::Parser;
+use import::import;
 use schema::ToFileExtension;
 use serde::{Deserialize, Serialize};
 
 mod cli;
 mod crypto;
 mod export;
+mod import;
 mod model;
 mod schema;
 
 fn main() -> Result<(), clap::Error> {
     let args = cli::Cli::parse();
-    let conn = model::create_db("./uvm-rs.db".as_ref()).unwrap();
+    let mut db_path = std::env::current_exe()?;
+    db_path.set_file_name("uvm-rs.db");
+    let mut conn = model::create_db(&db_path).unwrap();
     match args.operation {
-        cli::Operation::Import(_i) => todo!(),
+        cli::Operation::Import(i) => import(&mut conn, i.path),
         cli::Operation::Export(e) => {
             let open_box = load_file(&e.path)?;
             let sealed = export::export(&conn, open_box)?;

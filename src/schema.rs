@@ -49,6 +49,7 @@ pub struct Passkey {
 
     pub user_handle: String,
 
+    #[serde(alias = "userDiplayName")]
     pub user_display_name: String,
 
     // Shouldn't this be a Uint?
@@ -88,9 +89,9 @@ mod base64 {
     where
         D: Deserializer<'de>,
     {
-        <&str>::deserialize(de).and_then(|encoded| {
-            try_from_base64(encoded)
-                .or_else(|| try_from_base64url(encoded))
+        String::deserialize(de).and_then(|encoded| {
+            try_from_base64(&encoded)
+                .or_else(|| try_from_base64url(&encoded))
                 .ok_or_else(|| D::Error::custom("could not decode as base64 or base64url"))
         })
     }
@@ -98,7 +99,7 @@ mod base64 {
 
 /// Convert bytes to base64 without padding
 pub fn base64(data: &[u8]) -> String {
-    BASE64_NOPAD.encode(data)
+    BASE64.encode(data)
 }
 
 /// Try parsing from base64 with or without padding
