@@ -15,6 +15,7 @@ pub fn export(conn: &Connection, open_box: OpenBox) -> Result<SealedBox, clap::E
             )
         })?,
     };
+    dbg!(&vault);
 
     let rng = ring::rand::SystemRandom::new();
 

@@ -21,6 +21,7 @@ pub fn fetch_passkeys(conn: &Connection) -> Result<Vec<Passkey>> {
             "user_id",
             "username",
             "counter",
+            "key_alg",
             "key"
         from "passkeys""#,
     )?;
@@ -33,6 +34,7 @@ pub fn fetch_passkeys(conn: &Connection) -> Result<Vec<Passkey>> {
             user_handle: row.get("user_id")?,
             user_display_name: row.get("username")?,
             counter: row.get::<_, u64>("counter")?.to_string(),
+            key_algorithm: row.get("key_alg")?,
             private_key: try_from_base64(row.get_ref("key")?.as_str()?)
                 .ok_or(FromSqlError::InvalidType)?,
         })
@@ -42,31 +44,36 @@ pub fn fetch_passkeys(conn: &Connection) -> Result<Vec<Passkey>> {
 
 pub fn store_passkeys(conn: &mut Connection, passkeys: &[Passkey]) -> Result<()> {
     let tx = conn.transaction()?;
-    let mut stmt = tx.prepare(
-        r#"INSERT OR REPLACE INTO passkeys(
+    {
+        let mut stmt = tx.prepare(
+            r#"INSERT OR REPLACE INTO passkeys(
             "id",
             "rp_id",
             "rp_name",
             "user_id",
             "username",
             "counter",
+            "key_alg",
             "key"
         )
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
         "#,
-    )?;
+        )?;
 
-    for pk in passkeys {
-        stmt.execute((
-            &pk.credential_id,
-            &pk.relying_party_id,
-            &pk.relying_party_name,
-            &pk.user_handle,
-            &pk.user_display_name,
-            pk.counter.parse::<u64>().unwrap(),
-            base64(&pk.private_key),
-        ))?;
+        for pk in passkeys {
+            stmt.execute((
+                &pk.credential_id,
+                &pk.relying_party_id,
+                &pk.relying_party_name,
+                &pk.user_handle,
+                &pk.user_display_name,
+                pk.counter.parse::<u64>().unwrap(),
+                &pk.key_algorithm,
+                base64(&pk.private_key),
+            ))?;
+        }
     }
+    tx.commit()?;
 
     Ok(())
 }

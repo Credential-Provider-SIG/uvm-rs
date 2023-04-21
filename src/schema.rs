@@ -26,6 +26,12 @@ pub struct SealedBox {
 
     #[serde(with = "base64")]
     pub key_derivation_salt: Vec<u8>,
+
+    #[serde(with = "base64")]
+    pub encryption_nonce: Vec<u8>,
+
+    #[serde(with = "base64")]
+    pub authentication_tag: Vec<u8>,
 }
 
 impl ToFileExtension for SealedBox {
@@ -55,6 +61,8 @@ pub struct Passkey {
     // Shouldn't this be a Uint?
     pub counter: String,
 
+    pub key_algorithm: String,
+
     #[serde(with = "base64")]
     pub private_key: Vec<u8>,
 }
@@ -68,6 +76,7 @@ impl std::fmt::Debug for Passkey {
             .field("user_handle", &self.user_handle)
             .field("user_display_name", &self.user_display_name)
             .field("counter", &self.counter)
+            .field("key_algorithm", &self.key_algorithm)
             .field("private_key", &"<Redacted>")
             .finish()
     }

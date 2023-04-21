@@ -5,5 +5,6 @@ CREATE TABLE IF NOT EXISTS passkeys (
     "user_id"   TEXT NOT NULL,
     "username"  TEXT NOT NULL,
     "counter"   INTEGER DEFAULT 0 NOT NULL,
+    "key_alg"   TEXT NOT NULL,
     "key"       TEXT NOT NULL
 );

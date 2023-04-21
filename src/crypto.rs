@@ -87,40 +87,44 @@ impl LocalKeyPair {
 
         let mut encoded_vault = serde_json::to_vec(&vault).expect("This is a schema error");
 
-        key.seal_in_place_append_tag(nonce, Aad::empty(), &mut encoded_vault)
+        let tag = key
+            .seal_in_place_separate_tag(nonce, Aad::empty(), &mut encoded_vault)
             .map_err(|_| Error::Sealing)?;
-        let encrypted_vault = nonce_bytes.into_iter().chain(encoded_vault).collect();
 
         Ok(SealedBox {
             public_key: public_key.as_ref().to_vec(),
-            encrypted_vault,
+            encrypted_vault: encoded_vault,
+            encryption_nonce: nonce_bytes.into(),
+            authentication_tag: tag.as_ref().to_vec(),
             key_derivation_salt: salt_bytes.to_vec(),
         })
     }
 
-    pub fn open(self, mut sealed: SealedBox) -> Result<Vault, Error> {
+    pub fn open(self, sealed: SealedBox) -> Result<Vault, Error> {
         let salt = Salt::new(HKDF_SHA256, &sealed.key_derivation_salt);
         let peer_key = UnparsedPublicKey::new(&X25519, sealed.public_key);
-        if sealed.encrypted_vault.len() <= 12 {
-            return Err(Error::Opening);
-        }
-        let (nonce, encrypted_vault) = sealed.encrypted_vault.split_at_mut(12);
-        let nonce =
-            Nonce::try_assume_unique_for_key(nonce).expect("Garanteed to be 12 due to split above");
+
+        let nonce = Nonce::try_assume_unique_for_key(&sealed.encryption_nonce)
+            .expect("Garanteed to be 12 due to split above");
 
         let key = agree_ephemeral(self.0, &peer_key, Error::KeyExpansion, |shared_secret| {
             hkdf(shared_secret, salt)
         })?;
+        let mut in_out: Vec<u8> = sealed
+            .encrypted_vault
+            .into_iter()
+            .chain(sealed.authentication_tag)
+            .collect();
 
         let decrypted_vault = key
-            .open_in_place(nonce, Aad::empty(), encrypted_vault)
+            .open_in_place(nonce, Aad::empty(), &mut in_out)
             .map_err(|_| Error::Opening)?;
 
         serde_json::from_slice(decrypted_vault).map_err(Error::Decoding)
     }
 }
 
-fn hkdf<'n>(shared_secret: &[u8], salt: Salt) -> Result<LessSafeKey, Error> {
+fn hkdf(shared_secret: &[u8], salt: Salt) -> Result<LessSafeKey, Error> {
     let prk = salt.extract(shared_secret);
     let okm = prk
         .expand(&[], &AES_256_GCM)
@@ -140,6 +144,7 @@ pub fn mock_vault() -> Vault {
                 user_handle: "qj2Mza8VpfeyGUQ7DsjrNA".into(),
                 user_display_name: "wendy@1password.com".into(),
                 counter: "0".into(),
+                key_algorithm: "-7".into(),
                 private_key: vec![
                     218, 32, 172, 102, 165, 240, 198, 99, 5, 244, 84, 124, 112, 8, 78, 139, 17,
                     171, 147, 13, 27, 190, 226, 169, 8, 68, 234, 22, 250, 62, 22, 67,
@@ -152,6 +157,7 @@ pub fn mock_vault() -> Vault {
                 user_handle: "AyTX4-DemFSn19IWC9EDd_AvDFsUUi4vSd6EhiwoaFg".into(),
                 user_display_name: "wendy.appleseed@gmail.com".into(),
                 counter: "42".into(),
+                key_algorithm: "-7".into(),
                 private_key: vec![
                     202, 71, 46, 146, 44, 45, 13, 148, 133, 153, 77, 20, 30, 227, 113, 91, 58, 245,
                     139, 188, 126, 95, 171, 140, 5, 119, 13, 69, 229, 100, 84, 142,
