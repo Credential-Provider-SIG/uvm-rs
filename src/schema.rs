@@ -8,6 +8,13 @@ pub struct OpenBox {
     pub public_key: Vec<u8>,
 }
 
+pub trait ToFileExtension {
+    const FILE_EXT: &'static str;
+}
+impl ToFileExtension for OpenBox {
+    const FILE_EXT: &'static str = "openbox";
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SealedBox {
@@ -19,6 +26,10 @@ pub struct SealedBox {
 
     #[serde(with = "base64")]
     pub key_derivation_salt: Vec<u8>,
+}
+
+impl ToFileExtension for SealedBox {
+    const FILE_EXT: &'static str = "sealedbox";
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]

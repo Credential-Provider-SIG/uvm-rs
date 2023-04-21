@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
 
@@ -16,16 +16,6 @@ pub enum Operation {
     Import(Import),
     Export(Export),
     List,
-}
-
-impl Operation {
-    pub fn path(&self) -> Option<&Path> {
-        match self {
-            Operation::Import(i) => Some(&i.path),
-            Operation::Export(e) => Some(&e.path),
-            Operation::List => None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Args)]
