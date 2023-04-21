@@ -43,20 +43,29 @@ pub enum Error {
     Decoding(serde_json::Error),
 }
 
+impl From<Error> for clap::Error {
+    fn from(value: Error) -> Self {
+        clap::Error::raw(clap::error::ErrorKind::Io, value)
+    }
+}
+
 pub struct LocalKeyPair(EphemeralPrivateKey);
 
 impl LocalKeyPair {
     /// Return None when theres an issue comunicating with the `SecureRandom` elements.
-    pub fn new(rng: &dyn SecureRandom) -> Option<Self> {
+    pub fn new(rng: &dyn SecureRandom) -> Result<Self, Error> {
         EphemeralPrivateKey::generate(&X25519, rng)
-            .ok()
+            .map_err(|_| Error::Csprng)
             .map(LocalKeyPair)
     }
 
-    pub fn to_open_box(&self) -> Option<OpenBox> {
-        self.0.compute_public_key().ok().map(|pub_key| OpenBox {
-            public_key: pub_key.as_ref().to_vec(),
-        })
+    pub fn to_open_box(&self) -> Result<OpenBox, Error> {
+        self.0
+            .compute_public_key()
+            .map_err(|_| Error::GeneratingPubKey)
+            .map(|pub_key| OpenBox {
+                public_key: pub_key.as_ref().to_vec(),
+            })
     }
 
     pub fn seal(

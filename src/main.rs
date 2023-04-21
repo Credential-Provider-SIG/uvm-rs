@@ -4,9 +4,10 @@ use std::{
 };
 
 use clap::Parser;
-use import::import;
-use schema::ToFileExtension;
+use model::fetch_passkeys;
+use schema::{Passkey, ToFileExtension};
 use serde::{Deserialize, Serialize};
+use tabled::{settings::Style, Table};
 
 mod cli;
 mod crypto;
@@ -15,21 +16,28 @@ mod import;
 mod model;
 mod schema;
 
-fn main() -> Result<(), clap::Error> {
+fn main() {
     let args = cli::Cli::parse();
-    let mut db_path = std::env::current_exe()?;
+    let mut db_path = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(e) => clap::Error::from(e).exit(),
+    };
     db_path.set_file_name("uvm-rs.db");
     let mut conn = model::create_db(&db_path).unwrap();
-    match args.operation {
-        cli::Operation::Import(i) => import(&mut conn, i.path),
-        cli::Operation::Export(e) => {
-            let open_box = load_file(&e.path)?;
-            let sealed = export::export(&conn, open_box)?;
-            write_file(e.path, &sealed)
+    let res = match args.operation {
+        cli::Operation::Import(i) => import::import(&mut conn, i.path),
+        cli::Operation::Export(e) => export::export(&conn, e.path),
+        cli::Operation::List => {
+            let pks = fetch_passkeys(&conn).unwrap();
+            list(&pks);
+            Ok(())
         }
-        cli::Operation::List => todo!(),
+    };
+    if let Err(e) = res {
+        e.exit()
     }
 }
+
 fn load_file<T>(path: &Path) -> Result<T, clap::Error>
 where
     T: for<'a> Deserialize<'a> + ToFileExtension,
@@ -61,13 +69,18 @@ where
     T: Serialize + ToFileExtension,
 {
     let extension = T::FILE_EXT;
-    let file = if path.set_extension(extension) {
+    // if extension exists, assume its a file, otherwise, assume a folder
+    let file = if path.extension().is_some() && path.set_extension(extension) {
         File::create(path)?
     } else {
         // must be a directory
-        path.set_file_name(format!("uvm-rs.{extension}"));
+        path.push(format!("uvm-rs.{extension}"));
         File::create(path)?
     };
     serde_json::to_writer_pretty(file, contents)
         .map_err(|e| clap::Error::raw(clap::error::ErrorKind::Io, e))
+}
+
+fn list(passkeys: &[Passkey]) {
+    println!("{}", Table::new(passkeys).with(Style::markdown()))
 }

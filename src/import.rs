@@ -1,36 +1,58 @@
-use std::{path::PathBuf, sync::mpsc};
+use std::{
+    fs::create_dir_all,
+    path::{Path, PathBuf},
+    sync::mpsc,
+};
 
-use notify::{event::CreateKind, Event, EventKind, Watcher};
+use notify::{Event, Watcher};
 use rusqlite::Connection;
 
 use crate::{
     crypto::LocalKeyPair,
-    load_file,
+    list, load_file,
     model::store_passkeys,
     schema::{SealedBox, ToFileExtension},
     write_file,
 };
 
-pub fn import(conn: &mut Connection, dir: PathBuf) -> Result<(), clap::Error> {
+pub fn import(conn: &mut Connection, path: PathBuf) -> Result<(), clap::Error> {
     let rng = ring::rand::SystemRandom::new();
-    let key_pair = LocalKeyPair::new(&rng).unwrap();
+    let key_pair = LocalKeyPair::new(&rng)?;
 
-    let open_box = key_pair.to_open_box().unwrap();
+    let open_box = key_pair.to_open_box()?;
 
-    write_file(dir.clone(), &open_box)?;
+    let dir = if path.extension().is_some() {
+        path.parent().unwrap_or(Path::new("."))
+    } else {
+        &path
+    };
+    if !dir.exists() {
+        create_dir_all(dir)?;
+    }
+    write_file(path.clone(), &open_box)?;
 
     println!("Waiting for Sealed box in {}", dir.display());
     let (sender, recv) = mpsc::channel::<notify::Result<Event>>();
 
-    let mut watcher = notify::recommended_watcher(sender).unwrap();
+    let mut watcher = notify::recommended_watcher(sender).map_err(|_| {
+        clap::Error::raw(
+            clap::error::ErrorKind::Io,
+            format!("Cannot watcher for directory {}", dir.display()),
+        )
+    })?;
 
     watcher
-        .watch(&dir, notify::RecursiveMode::NonRecursive)
-        .unwrap();
+        .watch(dir, notify::RecursiveMode::NonRecursive)
+        .map_err(|_| {
+            clap::Error::raw(
+                clap::error::ErrorKind::Io,
+                format!("Cannot watcher for directory {}", dir.display()),
+            )
+        })?;
 
     let sealed_path = loop {
         let Ok(Ok(event)) = recv.recv() else {
-            panic!("oh no");
+            return Err(clap::Error::raw(clap::error::ErrorKind::Io, "failed to read from directory"))
         };
         let Some(sealed_path) = event
                 .paths
@@ -42,11 +64,16 @@ pub fn import(conn: &mut Connection, dir: PathBuf) -> Result<(), clap::Error> {
     };
 
     let sealed = load_file(&sealed_path)?;
-    let vault = key_pair.open(sealed).unwrap();
+    let vault = key_pair.open(sealed)?;
 
-    println!("{:#?}", vault);
+    store_passkeys(conn, &vault.passkeys).map_err(|_| {
+        clap::Error::raw(
+            clap::error::ErrorKind::Io,
+            "Could not store imported passkeys",
+        )
+    })?;
 
-    store_passkeys(conn, &vault.passkeys).unwrap();
+    list(&vault.passkeys);
 
     Ok(())
 }

@@ -1,12 +1,11 @@
+use std::path::PathBuf;
+
 use rusqlite::Connection;
 
-use crate::{
-    crypto::LocalKeyPair,
-    model::fetch_passkeys,
-    schema::{OpenBox, SealedBox, Vault},
-};
+use crate::{crypto::LocalKeyPair, load_file, model::fetch_passkeys, schema::Vault, write_file};
 
-pub fn export(conn: &Connection, open_box: OpenBox) -> Result<SealedBox, clap::Error> {
+pub fn export(conn: &Connection, path: PathBuf) -> Result<(), clap::Error> {
+    let open_box = load_file(&path)?;
     let vault = Vault {
         passkeys: fetch_passkeys(conn).map_err(|_| {
             clap::Error::raw(
@@ -15,17 +14,12 @@ pub fn export(conn: &Connection, open_box: OpenBox) -> Result<SealedBox, clap::E
             )
         })?,
     };
-    dbg!(&vault);
 
     let rng = ring::rand::SystemRandom::new();
 
-    let keys = LocalKeyPair::new(&rng).ok_or_else(|| {
-        clap::Error::raw(
-            clap::error::ErrorKind::Io,
-            "Could not generate local key pair",
-        )
-    })?;
+    let keys = LocalKeyPair::new(&rng)?;
 
-    keys.seal(open_box, vault, &rng)
-        .map_err(|e| clap::Error::raw(clap::error::ErrorKind::Io, e))
+    let sealed = keys.seal(open_box, vault, &rng)?;
+
+    write_file(path, &sealed)
 }

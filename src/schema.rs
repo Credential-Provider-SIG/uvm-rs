@@ -1,5 +1,6 @@
 use data_encoding::{Specification, BASE64, BASE64URL, BASE64_NOPAD};
 use serde::{Deserialize, Serialize};
+use tabled::Tabled;
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -44,26 +45,33 @@ pub struct Vault {
     pub passkeys: Vec<Passkey>,
 }
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Tabled)]
 #[serde(rename_all = "camelCase")]
 pub struct Passkey {
+    #[tabled(skip)]
     pub credential_id: String,
 
+    #[tabled(skip)]
     pub relying_party_id: String,
 
+    #[tabled(rename = "Website")]
     pub relying_party_name: String,
 
+    #[tabled(skip)]
     pub user_handle: String,
 
-    #[serde(alias = "userDiplayName")]
+    #[tabled(rename = "Username")]
     pub user_display_name: String,
 
     // Shouldn't this be a Uint?
+    #[tabled(skip)]
     pub counter: String,
 
+    #[tabled(skip)]
     pub key_algorithm: String,
 
     #[serde(with = "base64")]
+    #[tabled(skip)]
     pub private_key: Vec<u8>,
 }
 
